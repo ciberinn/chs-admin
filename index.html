@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>ЧС Администрации</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f4f6f9;
+            margin: 0;
+            padding: 16px;
+            color: #1e293b;
+        }
+        .container { max-width: 600px; margin: 0 auto; }
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        h1, h2 { margin-top: 0; }
+        label { display: block; font-weight: 500; margin-bottom: 6px; font-size: 0.9rem; color: #64748b; }
+        input, textarea, button {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            font-size: 16px;
+            font-family: inherit;
+            margin-bottom: 16px;
+            background: #fafcff;
+        }
+        textarea { resize: vertical; min-height: 80px; }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        button:hover { background: #1d4ed8; }
+        .error { color: #dc2626; font-size: 0.9rem; margin-top: -8px; margin-bottom: 12px; }
+        .success { color: #16a34a; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+        }
+        th, td {
+            padding: 10px 6px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        th { background: #f8fafc; font-weight: 600; }
+        .logout-btn { background: #64748b; margin-top: 10px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🛡️ ЧС Администрации</h1>
+
+    <div id="loginBlock" class="card">
+        <h2>Вход</h2>
+        <div id="loginError" class="error"></div>
+        <label>Логин</label>
+        <input type="text" id="loginUsername" placeholder="admin" autocomplete="username">
+        <label>Пароль</label>
+        <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+        <button id="loginBtn">Войти</button>
+    </div>
+
+    <div id="appBlock" style="display: none;">
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2>👤 <span id="currentUserDisplay"></span></h2>
+                <button class="logout-btn" id="logoutBtn" style="width: auto; padding: 8px 16px;">Выйти</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>➕ Добавить в ЧС</h2>
+            <div id="addMessage"></div>
+            <label>ФИО *</label>
+            <input type="text" id="fullName" placeholder="Иванов Иван Иванович">
+            <label>ID аккаунта *</label>
+            <input type="text" id="accountId" placeholder="Telegram ID / Discord ID">
+            <label>Причина *</label>
+            <textarea id="reason" placeholder="Мошенничество, спам..."></textarea>
+            <label>Доп. информация</label>
+            <input type="text" id="additionalInfo" placeholder="Любые приметы">
+            <button id="addBtn">Добавить запись</button>
+        </div>
+
+        <div class="card">
+            <h2>🔍 Поиск по базе</h2>
+            <input type="text" id="searchQuery" placeholder="ФИО, ID, причина...">
+            <button id="searchBtn">Искать</button>
+            <div id="searchResults" style="margin-top: 20px; overflow-x: auto;"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbz3Tukpy367zc0b8R0KBpNTbDxvSqc_0oWLOMElQGaZuZyI4PjQ4PfDzMMIPuc8YUm0iQ/exec';
+
+    let currentUser = null;
+
+    async function callBackend(action, data) {
+        try {
+            const response = await fetch(BACKEND_URL + '?action=' + action, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await response.json();
+            return result;
+        } catch (error) {
+            console.error('Ошибка сети:', error);
+            return { success: false, message: 'Нет соединения с сервером' };
+        }
+    }
+
+    document.getElementById('loginBtn').addEventListener('click', async () => {
+        const username = document.getElementById('loginUsername').value.trim();
+        const password = document.getElementById('loginPassword').value;
+        const errDiv = document.getElementById('loginError');
+
+        if (!username || !password) {
+            errDiv.textContent = 'Введите логин и пароль';
+            return;
+        }
+
+        const res = await callBackend('login', { username, password });
+        if (res.success) {
+            currentUser = res.user;
+            document.getElementById('loginBlock').style.display = 'none';
+            document.getElementById('appBlock').style.display = 'block';
+            document.getElementById('currentUserDisplay').textContent = currentUser.username;
+            document.getElementById('loginUsername').value = '';
+            document.getElementById('loginPassword').value = '';
+            errDiv.textContent = '';
+        } else {
+            errDiv.textContent = res.message || 'Ошибка входа';
+        }
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        currentUser = null;
+        document.getElementById('loginBlock').style.display = 'block';
+        document.getElementById('appBlock').style.display = 'none';
+        document.getElementById('searchResults').innerHTML = '';
+    });
+
+    document.getElementById('addBtn').addEventListener('click', async () => {
+        const fullName = document.getElementById('fullName').value.trim();
+        const accountId = document.getElementById('accountId').value.trim();
+        const reason = document.getElementById('reason').value.trim();
+        const additionalInfo = document.getElementById('additionalInfo').value.trim();
+        const msgDiv = document.getElementById('addMessage');
+
+        if (!fullName || !accountId || !reason) {
+            msgDiv.textContent = 'Заполните обязательные поля (ФИО, ID, Причина)';
+            msgDiv.className = 'error';
+            return;
+        }
+
+        const res = await callBackend('add', {
+            fullName, accountId, reason,
+            addedBy: currentUser.id,
+            additionalInfo
+        });
+
+        if (res.success) {
+            msgDiv.textContent = `✅ ${res.message}. ID: ${res.id}`;
+            msgDiv.className = 'success';
+            document.getElementById('fullName').value = '';
+            document.getElementById('accountId').value = '';
+            document.getElementById('reason').value = '';
+            document.getElementById('additionalInfo').value = '';
+        } else {
+            msgDiv.textContent = `❌ ${res.message}`;
+            msgDiv.className = 'error';
+        }
+    });
+
+    document.getElementById('searchBtn').addEventListener('click', async () => {
+        const query = document.getElementById('searchQuery').value.trim();
+        const resultsDiv = document.getElementById('searchResults');
+
+        if (!query) {
+            resultsDiv.innerHTML = '<p style="color: #64748b;">Введите запрос для поиска</p>';
+            return;
+        }
+
+        const results = await callBackend('search', { query });
+
+        if (Array.isArray(results) && results.length > 0) {
+            let html = '<table><thead><tr><th>ID</th><th>ФИО</th><th>Аккаунт</th><th>Причина</th><th>Дата</th><th>Добавил</th><th>Доп.</th></tr></thead><tbody>';
+            results.forEach(item => {
+                html += `<tr>
+                    <td>${item.ID || ''}</td>
+                    <td>${item.FullName || ''}</td>
+                    <td>${item.AccountID || ''}</td>
+                    <td>${item.Reason || ''}</td>
+                    <td>${item.DateAdded || ''}</td>
+                    <td>${item.AddedBy || ''}</td>
+                    <td>${item.AdditionalInfo || ''}</td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            resultsDiv.innerHTML = html;
+        } else {
+            resultsDiv.innerHTML = '<p>🔎 Ничего не найдено</p>';
+        }
+    });
+
+    document.getElementById('loginPassword').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') document.getElementById('loginBtn').click();
+    });
+    document.getElementById('searchQuery').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') document.getElementById('searchBtn').click();
+    });
+</script>
+</body>
+</html>
